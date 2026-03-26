@@ -2,7 +2,7 @@
 connector.py - WebSocket client that connects to gps-relay and receives GPS data.
 
 Flow:
-    gps-bridge connect --relay wss://... --token xxx
+    gps-bridge connect --relay wss://... --token xxx --name "Alice"
         ↓
     Connect to relay WebSocket
         ↓
@@ -10,7 +10,7 @@ Flow:
         ↓
     Decrypt with local private key
         ↓
-    Store in SQLite (same DB as before)
+    Store in SQLite under the given name
 """
 
 from __future__ import annotations
@@ -28,32 +28,34 @@ from gps_bridge.storage import init_db, insert_location
 logger = logging.getLogger("gps_bridge.connector")
 
 
-async def run(relay_url: str, token: str) -> None:
+async def run(relay_url: str, token: str, name: str = "default") -> None:
     """
     Connect to the relay and receive GPS messages until interrupted.
 
     Args:
         relay_url: Base WebSocket URL of the relay, e.g. wss://example.com/relay
         token:     Pairing token shared with the phone app.
+        name:      Tracker identifier stored with each record (e.g. "Alice").
     """
     init_db()
     private_key = load_private_key()
 
     ws_url = f"{relay_url.rstrip('/')}/ws/{token}"
-    logger.info("Connecting to relay: %s", ws_url)
+    logger.info("Connecting to relay: %s (name=%s)", ws_url, name)
     print(f"Connecting to relay: {ws_url}")
+    print(f"Tracker name: {name}")
     print("Waiting for GPS data from phone... (Ctrl+C to stop)")
 
     async for websocket in websockets.connect(ws_url):
         try:
             async for raw in websocket:
-                _handle_message(raw, private_key)
+                _handle_message(raw, private_key, name)
         except websockets.ConnectionClosed:
             logger.warning("Connection closed, reconnecting...")
             print("Connection closed, reconnecting...")
 
 
-def _handle_message(raw: str, private_key) -> None:
+def _handle_message(raw: str, private_key, name: str) -> None:
     """Decrypt and store a single incoming message."""
     try:
         payload = json.loads(raw)
@@ -82,5 +84,5 @@ def _handle_message(raw: str, private_key) -> None:
         logger.warning("Missing lat/lng/timestamp in payload.")
         return
 
-    insert_location(float(lat), float(lng), str(timestamp))
-    print(f"[ok] {timestamp}  lat={lat:.6f}  lng={lng:.6f}")
+    insert_location(float(lat), float(lng), str(timestamp), name=name)
+    print(f"[{name}] {timestamp}  lat={lat:.6f}  lng={lng:.6f}")

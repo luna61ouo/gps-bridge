@@ -2,11 +2,13 @@
 main.py - CLI entry point for gps-bridge.
 
 Commands:
-    gps-bridge keygen               Generate a new X25519 keypair.
-    gps-bridge serve                Start the FastAPI server.
-    gps-bridge latest               Print the latest GPS fix as JSON.
-    gps-bridge history [--limit N]  Print recent GPS history as JSON.
-    gps-bridge pubkey               Print the current public key.
+    gps-bridge keygen                           Generate a new X25519 keypair.
+    gps-bridge serve                            Start the FastAPI server.
+    gps-bridge connect --relay URL --token T    Receive GPS from phone.
+    gps-bridge latest [--name NAME]             Print the latest GPS fix as JSON.
+    gps-bridge history [--limit N] [--name N]   Print recent GPS history as JSON.
+    gps-bridge list                             List all trackers with latest fix.
+    gps-bridge pubkey                           Print the current public key.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from gps_bridge.config import (
     save_keypair,
 )
 from gps_bridge.crypto import generate_keypair, public_key_to_b64
-from gps_bridge.storage import get_history, get_latest, init_db
+from gps_bridge.storage import get_history, get_latest, get_trackers, init_db
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +160,13 @@ def serve(host: str, port: int, log_level: str) -> None:
     required=True,
     help="Pairing token shared with the phone app.",
 )
-def connect(relay: str, token: str) -> None:
+@click.option(
+    "--name",
+    default="default",
+    show_default=True,
+    help="Tracker identifier for this connection (e.g. Alice).",
+)
+def connect(relay: str, token: str, name: str) -> None:
     """Connect to the relay and receive encrypted GPS from the phone."""
     if not config_exists():
         click.echo(
@@ -169,7 +177,7 @@ def connect(relay: str, token: str) -> None:
 
     from gps_bridge.connector import run
     try:
-        asyncio.run(run(relay, token))
+        asyncio.run(run(relay, token, name=name))
     except KeyboardInterrupt:
         click.echo("\nStopped.")
 
@@ -180,10 +188,15 @@ def connect(relay: str, token: str) -> None:
 
 
 @cli.command()
-def latest() -> None:
+@click.option(
+    "--name",
+    default=None,
+    help="Tracker name to query. Omit to get the latest across all trackers.",
+)
+def latest(name: str | None) -> None:
     """Print the latest GPS coordinates as JSON."""
     init_db()
-    record = get_latest()
+    record = get_latest(name=name)
     if record is None:
         click.echo(json.dumps({"status": "no data"}))
         sys.exit(1)
@@ -203,14 +216,35 @@ def latest() -> None:
     type=click.IntRange(1, 1000),
     help="Number of recent records to display.",
 )
-def history(limit: int) -> None:
+@click.option(
+    "--name",
+    default=None,
+    help="Tracker name to query. Omit to get history across all trackers.",
+)
+def history(limit: int, name: str | None) -> None:
     """Show recent GPS history as a JSON array (newest first)."""
     init_db()
-    records = get_history(limit=limit)
+    records = get_history(limit=limit, name=name)
     if not records:
         click.echo(json.dumps([]))
         return
     click.echo(json.dumps(records, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# list
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="list")
+def list_trackers() -> None:
+    """List all known trackers with their latest fix and record count."""
+    init_db()
+    trackers = get_trackers()
+    if not trackers:
+        click.echo(json.dumps([]))
+        return
+    click.echo(json.dumps(trackers, indent=2))
 
 
 # ---------------------------------------------------------------------------
