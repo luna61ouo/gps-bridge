@@ -43,7 +43,7 @@ from fastapi.responses import JSONResponse
 from gps_bridge import __version__
 from gps_bridge.config import load_private_key
 from gps_bridge.crypto import decrypt_payload
-from gps_bridge.storage import get_latest, init_db, insert_location
+from gps_bridge.storage import get_latest, init_db, insert_location, update_tracker_settings
 
 logger = logging.getLogger("gps_bridge.server")
 
@@ -160,8 +160,22 @@ async def receive_gps(request: Request) -> JSONResponse:
         return _error("lng must be between -180 and 180.")
 
     # --- Persist ------------------------------------------------------------
+    save_history: bool = bool(location.get("save_history", False))
+    retention_hours: int = int(location.get("retention_hours", 168))
+
     try:
-        insert_location(float(lat), float(lng), timestamp)
+        insert_location(
+            float(lat), float(lng), timestamp,
+            save_history=save_history,
+            retention_hours=retention_hours,
+        )
+        update_tracker_settings(
+            "default",
+            confirm_mode=location.get("confirm_mode"),
+            update_interval_seconds=location.get("update_interval_seconds"),
+            history_granularity_seconds=location.get("history_granularity_seconds"),
+            retention_hours=retention_hours,
+        )
     except Exception as exc:
         logger.error("Database insert failed: %s", exc)
         return _error("Failed to store location.", 500)

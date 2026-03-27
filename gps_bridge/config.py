@@ -41,6 +41,29 @@ CONFIG_FILE = GPS_BRIDGE_DIR / "config.json"
 DB_FILE = GPS_BRIDGE_DIR / "locations.db"
 
 
+# ---------------------------------------------------------------------------
+# Settings schema
+# ---------------------------------------------------------------------------
+
+#: Default values for all user-configurable parameters.
+#: Edit ~/.gps-bridge/config.json → "settings" to override.
+SETTINGS_DEFAULTS: dict[str, Any] = {
+    # How many non-history (latest-only) records to keep per tracker.
+    # These are overwritten frequently; 2 is enough for redundancy.
+    "max_latest_records": 2,
+
+    # Hard cap on the number of records returned by `gps-bridge history --limit`.
+    # Prevents accidentally loading thousands of coordinates into a single LLM response.
+    # Raise this only if you need bulk data export to a non-LLM tool.
+    "max_history_limit": 1000,
+
+    # Display timezone for timestamps in CLI output.
+    # null  → auto-detect from the latest GPS coordinates (recommended)
+    # str   → IANA timezone name, e.g. "Asia/Taipei", "America/New_York"
+    "timezone": None,
+}
+
+
 def ensure_dir() -> None:
     """Create the ~/.gps-bridge/ directory if it does not yet exist."""
     GPS_BRIDGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,6 +95,69 @@ def _write_raw(data: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def get_display_timezone(lat: float | None = None, lng: float | None = None) -> str:
+    """
+    Return the IANA timezone name to use for display.
+
+    Priority:
+      1. User setting (config.json → settings → timezone)
+      2. Auto-detect from provided GPS coordinates via timezonefinder
+      3. Fallback: "UTC"
+
+    Args:
+        lat: Latitude (used for auto-detect when timezone setting is null).
+        lng: Longitude (used for auto-detect when timezone setting is null).
+    """
+    tz = load_settings().get("timezone")
+    if tz:
+        return tz
+
+    if lat is not None and lng is not None:
+        try:
+            from timezonefinder import TimezoneFinder
+            detected = TimezoneFinder().timezone_at(lat=lat, lng=lng)
+            if detected:
+                return detected
+        except Exception:
+            pass
+
+    return "UTC"
+
+
+def load_settings() -> dict[str, Any]:
+    """
+    Return merged settings: SETTINGS_DEFAULTS overridden by values in config.json.
+
+    Users can edit ~/.gps-bridge/config.json and add/modify the "settings" object:
+        {
+            "private_key": "...",
+            "public_key":  "...",
+            "settings": {
+                "max_latest_records": 2,
+                "max_history_limit":  1000
+            }
+        }
+    """
+    stored = _read_raw().get("settings", {})
+    return {key: stored.get(key, default) for key, default in SETTINGS_DEFAULTS.items()}
+
+
+def save_settings(updates: dict[str, Any]) -> None:
+    """
+    Persist *updates* into the "settings" block of config.json.
+
+    Unknown keys in *updates* are ignored (only SETTINGS_DEFAULTS keys are written).
+    Existing config values (keypair etc.) are preserved.
+    """
+    data = _read_raw()
+    current = data.get("settings", {})
+    for key in SETTINGS_DEFAULTS:
+        if key in updates:
+            current[key] = updates[key]
+    data["settings"] = current
+    _write_raw(data)
 
 
 def config_exists() -> bool:

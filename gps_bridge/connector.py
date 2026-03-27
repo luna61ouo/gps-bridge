@@ -23,7 +23,7 @@ from cryptography.exceptions import InvalidTag
 
 from gps_bridge.config import load_private_key
 from gps_bridge.crypto import decrypt_payload
-from gps_bridge.storage import init_db, insert_location
+from gps_bridge.storage import init_db, insert_location, update_tracker_settings
 
 logger = logging.getLogger("gps_bridge.connector")
 
@@ -84,5 +84,22 @@ def _handle_message(raw: str, private_key, name: str) -> None:
         logger.warning("Missing lat/lng/timestamp in payload.")
         return
 
-    insert_location(float(lat), float(lng), str(timestamp), name=name)
-    print(f"[{name}] {timestamp}  lat={lat:.6f}  lng={lng:.6f}")
+    save_history = bool(data.get("save_history", False))
+    retention_hours = int(data.get("retention_hours", 168))
+    insert_location(
+        float(lat), float(lng), str(timestamp),
+        name=name,
+        save_history=save_history,
+        retention_hours=retention_hours,
+    )
+
+    update_tracker_settings(
+        name,
+        confirm_mode=data.get("confirm_mode"),
+        update_interval_seconds=data.get("update_interval_seconds"),
+        history_granularity_seconds=data.get("history_granularity_seconds"),
+        retention_hours=retention_hours,
+    )
+
+    history_marker = " [H]" if save_history else ""
+    print(f"[{name}] {timestamp}  lat={lat:.6f}  lng={lng:.6f}{history_marker}")

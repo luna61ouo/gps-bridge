@@ -10,27 +10,30 @@ Schema:
         lat         REAL    NOT NULL,
         lng         REAL    NOT NULL,
         timestamp   TEXT    NOT NULL,   -- ISO-8601 from the phone payload
-        received_at TEXT    NOT NULL    -- ISO-8601 UTC, set by the server
+        received_at TEXT    NOT NULL,   -- ISO-8601 UTC, set by the server
+        is_history  INTEGER NOT NULL DEFAULT 0  -- 1 = history record, 0 = latest-only
     );
 
-A hard cap of MAX_RECORDS (1000) most-recent rows per name is enforced after each insert.
+Records with is_history=0 are kept only for the most recent MAX_LATEST per name.
+Records with is_history=1 are pruned by time (retention_hours supplied per insert).
 """
 
 from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Generator
 
-from gps_bridge.config import DB_FILE, ensure_dir
-
+from gps_bridge.config import DB_FILE, ensure_dir, load_settings
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants (loaded from ~/.gps-bridge/config.json → "settings")
 # ---------------------------------------------------------------------------
 
-MAX_RECORDS = 1000
+_settings = load_settings()
+MAX_RECORDS: int = _settings["max_history_limit"]
+MAX_LATEST: int = _settings["max_latest_records"]
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS locations (
@@ -39,13 +42,30 @@ CREATE TABLE IF NOT EXISTS locations (
     lat         REAL    NOT NULL,
     lng         REAL    NOT NULL,
     timestamp   TEXT    NOT NULL,
-    received_at TEXT    NOT NULL
+    received_at TEXT    NOT NULL,
+    is_history  INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+_CREATE_TRACKER_SETTINGS_SQL = """
+CREATE TABLE IF NOT EXISTS tracker_settings (
+    name                        TEXT    PRIMARY KEY,
+    confirm_mode                TEXT,
+    update_interval_seconds     INTEGER,
+    history_granularity_seconds INTEGER,
+    retention_hours             INTEGER,
+    last_updated                TEXT    NOT NULL
 );
 """
 
 _CREATE_INDEX_SQL = """
 CREATE INDEX IF NOT EXISTS idx_locations_name_received_at
     ON locations (name, received_at DESC);
+"""
+
+_CREATE_HISTORY_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_locations_name_history
+    ON locations (name, is_history, received_at DESC);
 """
 
 
@@ -78,9 +98,7 @@ def init_db() -> None:
     """
     Initialise the database schema.
 
-    Safe to call multiple times. Also migrates existing DBs that lack the
-    'name' column by adding it with a default value of 'default'.
-    Migration runs before index creation so the index can reference 'name'.
+    Safe to call multiple times. Runs all migrations before creating indexes.
     """
     with _get_conn() as conn:
         conn.execute(_CREATE_TABLE_SQL)
@@ -90,7 +108,13 @@ def init_db() -> None:
         if "name" not in cols:
             conn.execute("ALTER TABLE locations ADD COLUMN name TEXT NOT NULL DEFAULT 'default'")
 
+        # Migration: add 'is_history' column
+        if "is_history" not in cols:
+            conn.execute("ALTER TABLE locations ADD COLUMN is_history INTEGER NOT NULL DEFAULT 0")
+
+        conn.execute(_CREATE_TRACKER_SETTINGS_SQL)
         conn.execute(_CREATE_INDEX_SQL)
+        conn.execute(_CREATE_HISTORY_INDEX_SQL)
 
 
 # ---------------------------------------------------------------------------
@@ -98,36 +122,113 @@ def init_db() -> None:
 # ---------------------------------------------------------------------------
 
 
-def insert_location(lat: float, lng: float, timestamp: str, name: str = "default") -> None:
+def insert_location(
+    lat: float,
+    lng: float,
+    timestamp: str,
+    name: str = "default",
+    save_history: bool = False,
+    retention_hours: int = 168,
+) -> None:
     """
-    Insert a new GPS record and prune old records to stay within MAX_RECORDS per name.
+    Insert a new GPS record and prune old records.
 
     Args:
-        lat:       Latitude in decimal degrees.
-        lng:       Longitude in decimal degrees.
-        timestamp: ISO-8601 timestamp string from the phone payload.
-        name:      Tracker identifier (e.g. "Alice"). Defaults to 'default'.
+        lat:             Latitude in decimal degrees.
+        lng:             Longitude in decimal degrees.
+        timestamp:       ISO-8601 timestamp string from the phone payload.
+        name:            Tracker identifier (e.g. "Alice"). Defaults to 'default'.
+        save_history:    If True, record is tagged as a history point and pruned
+                         by time. If False, only the most recent MAX_LATEST
+                         non-history records per name are kept.
+        retention_hours: How many hours of history to retain. -1 means unlimited.
+                         Only used when save_history=True.
     """
     received_at = datetime.now(timezone.utc).isoformat()
+    is_history = 1 if save_history else 0
 
     with _get_conn() as conn:
         conn.execute(
-            "INSERT INTO locations (name, lat, lng, timestamp, received_at) VALUES (?, ?, ?, ?, ?)",
-            (name, lat, lng, timestamp, received_at),
+            "INSERT INTO locations (name, lat, lng, timestamp, received_at, is_history) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (name, lat, lng, timestamp, received_at, is_history),
         )
-        # Prune oldest rows for this name beyond MAX_RECORDS
+
+        if save_history:
+            # Prune history records older than retention_hours for this name
+            if retention_hours > 0:
+                cutoff = (
+                    datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+                ).isoformat()
+                conn.execute(
+                    "DELETE FROM locations WHERE name = ? AND is_history = 1 AND received_at < ?",
+                    (name, cutoff),
+                )
+        else:
+            # Keep only the most recent MAX_LATEST non-history records per name
+            conn.execute(
+                """
+                DELETE FROM locations
+                WHERE name = ? AND is_history = 0 AND id NOT IN (
+                    SELECT id FROM locations
+                    WHERE name = ? AND is_history = 0
+                    ORDER BY received_at DESC
+                    LIMIT ?
+                )
+                """,
+                (name, name, MAX_LATEST),
+            )
+
+
+def update_tracker_settings(
+    name: str,
+    *,
+    confirm_mode: str | None = None,
+    update_interval_seconds: int | None = None,
+    history_granularity_seconds: int | None = None,
+    retention_hours: int | None = None,
+) -> None:
+    """
+    Upsert phone-side settings for a tracker.
+    Called each time a GPS payload is received that contains settings fields.
+    """
+    last_updated = datetime.now(timezone.utc).isoformat()
+    with _get_conn() as conn:
         conn.execute(
             """
-            DELETE FROM locations
-            WHERE name = ? AND id NOT IN (
-                SELECT id FROM locations
-                WHERE name = ?
-                ORDER BY received_at DESC
-                LIMIT ?
-            )
+            INSERT INTO tracker_settings
+                (name, confirm_mode, update_interval_seconds,
+                 history_granularity_seconds, retention_hours, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(name) DO UPDATE SET
+                confirm_mode                = COALESCE(excluded.confirm_mode, confirm_mode),
+                update_interval_seconds     = COALESCE(excluded.update_interval_seconds, update_interval_seconds),
+                history_granularity_seconds = COALESCE(excluded.history_granularity_seconds, history_granularity_seconds),
+                retention_hours             = COALESCE(excluded.retention_hours, retention_hours),
+                last_updated                = excluded.last_updated
             """,
-            (name, name, MAX_RECORDS),
+            (name, confirm_mode, update_interval_seconds,
+             history_granularity_seconds, retention_hours, last_updated),
         )
+
+
+def get_tracker_settings(name: str | None = None) -> list[dict]:
+    """
+    Return phone-side settings for one or all trackers.
+
+    Args:
+        name: Tracker name. If None, returns settings for all trackers.
+    """
+    with _get_conn() as conn:
+        if name is not None:
+            rows = conn.execute(
+                "SELECT * FROM tracker_settings WHERE name = ?", (name,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM tracker_settings ORDER BY last_updated DESC"
+            ).fetchall()
+    return [dict(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +271,7 @@ def get_latest(name: str | None = None) -> dict | None:
 
 def get_history(limit: int = 10, name: str | None = None) -> list[dict]:
     """
-    Return the *limit* most-recently received locations, newest first.
+    Return the *limit* most-recently stored history records (is_history=1), newest first.
 
     Args:
         limit: Maximum number of records to return (capped at MAX_RECORDS).
@@ -184,13 +285,13 @@ def get_history(limit: int = 10, name: str | None = None) -> list[dict]:
         if name is not None:
             rows = conn.execute(
                 "SELECT id, name, lat, lng, timestamp, received_at FROM locations "
-                "WHERE name = ? ORDER BY received_at DESC LIMIT ?",
+                "WHERE name = ? AND is_history = 1 ORDER BY received_at DESC LIMIT ?",
                 (name, limit),
             ).fetchall()
         else:
             rows = conn.execute(
                 "SELECT id, name, lat, lng, timestamp, received_at FROM locations "
-                "ORDER BY received_at DESC LIMIT ?",
+                "WHERE is_history = 1 ORDER BY received_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
     return [dict(row) for row in rows]
