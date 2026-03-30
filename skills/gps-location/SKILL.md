@@ -11,6 +11,8 @@ Retrieve GPS coordinates from the locally installed `gps-bridge` CLI.
 
 When the user says they have installed the app and want to start setup, follow these steps in order.
 
+**IMPORTANT:** You MUST complete ALL steps and show the user ALL three values (public key, token, relay URL) before asking them to configure the app. Do not skip any step.
+
 ### Step 1 — Keypair
 
 Check if a keypair already exists:
@@ -19,18 +21,20 @@ Check if a keypair already exists:
 gps-bridge pubkey
 ```
 
-- If it prints a Base64 key → keypair exists, use it, **skip keygen**.
+- If it prints a Base64 key → keypair already exists, use it, **skip keygen**.
 - If it errors → run `gps-bridge keygen` to generate one, then print the public key.
+
+Save the public key — you will give it to the user in Step 4.
 
 ### Step 2 — Token
 
-Generate a random pairing token and show it to the user:
+Generate a random pairing token:
 
 ```python
 import secrets; print(secrets.token_urlsafe(32))
 ```
 
-Tell the user: "This is your pairing token. Keep it private — anyone with it can connect to your GPS stream."
+Save this token — you will give it to the user in Step 4, and use it in Step 3.
 
 ### Step 3 — Start the bridge receiver
 
@@ -38,21 +42,28 @@ Tell the user: "This is your pairing token. Keep it private — anyone with it c
 gps-bridge connect --relay wss://openclaw-gps-track.duckdns.org/relay --token <TOKEN>
 ```
 
-Use the default relay URL above. Do not ask the user about relay unless they specifically request self-hosting or a custom relay.
+Use the default relay URL above. Do not ask the user about relay or suggest changing it unless they specifically request self-hosting.
 
 Leave this command running in a terminal. The bridge now waits for the phone.
 
-### Step 4 — Guide the user to configure the app
+### Step 4 — Give the user ALL pairing info at once
 
-Tell the user to open the app → Settings, and fill in three fields:
+Show the user these values in a clear, copy-friendly format. All three are required:
 
-| Field | Value |
-|-------|-------|
-| Token（配對碼） | the token from Step 2 |
-| 伺服器公鑰 | the Base64 public key from Step 1 |
-| Relay Server | leave as default (already pre-filled) |
+```
+📋 在手機 App 的設定頁面填入以下資訊：
 
-### Step 5 — Verify
+Bridge 公鑰：<paste the Base64 public key from Step 1>
+配對碼（Token）：<paste the token from Step 2>
+Relay 伺服器：不用改（App 已預設官方伺服器）
+```
+
+**Checklist — confirm you provided all of these before proceeding:**
+- [ ] Bridge public key (Base64 string)
+- [ ] Pairing token
+- [ ] Relay URL (tell user to leave as default)
+
+### Step 5 — Verify (CRITICAL)
 
 After the user taps "Start Tracking" in the app, wait a few seconds then run:
 
@@ -61,7 +72,12 @@ gps-bridge latest
 ```
 
 - If a record appears → setup complete. Tell the user GPS data is flowing.
-- If `{"status": "no data"}` → check that `gps-bridge connect` is still running and the token matches in both places.
+- If `{"status": "no data"}` after 30 seconds → troubleshoot:
+  1. Is `gps-bridge connect` still running?
+  2. Does the token match in both places (bridge command and app settings)?
+  3. Does the public key match? (run `gps-bridge pubkey` and compare with app settings)
+
+**IMPORTANT:** The app will show "sending" even if the token or public key is wrong, because the relay server only forwards encrypted data without validating it. The ONLY way to confirm the pairing is correct is to check `gps-bridge latest` — if it returns data, pairing is working. If not, the token or public key is likely mismatched.
 
 ---
 
