@@ -47,6 +47,8 @@ DB_FILE = GPS_BRIDGE_DIR / "locations.db"
 
 #: Default values for all user-configurable parameters.
 #: Edit ~/.gps-bridge/config.json → "settings" to override.
+DEFAULT_RELAY_URL = "wss://openclaw-gps-track.duckdns.org/relay"
+
 SETTINGS_DEFAULTS: dict[str, Any] = {
     # How many non-history (latest-only) records to keep per tracker.
     # These are overwritten frequently; 2 is enough for redundancy.

@@ -25,6 +25,7 @@ import uvicorn
 
 from gps_bridge.config import (
     CONFIG_FILE,
+    DEFAULT_RELAY_URL,
     GPS_BRIDGE_DIR,
     SETTINGS_DEFAULTS,
     config_exists,
@@ -189,8 +190,9 @@ def serve(host: str, port: int, log_level: str) -> None:
 @cli.command()
 @click.option(
     "--relay",
-    required=True,
-    help="Base WebSocket URL of the relay, e.g. wss://example.com/relay",
+    default=DEFAULT_RELAY_URL,
+    show_default=True,
+    help="Base WebSocket URL of the relay.",
 )
 @click.option(
     "--token",
