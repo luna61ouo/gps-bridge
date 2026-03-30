@@ -11,7 +11,7 @@ Retrieve GPS coordinates from the locally installed `gps-bridge` CLI.
 
 When the user says they have installed the app and want to start setup, follow these steps in order.
 
-**IMPORTANT:** You MUST complete ALL steps and show the user ALL three values (public key, token, relay URL) before asking them to configure the app. Do not skip any step.
+**IMPORTANT:** You MUST complete ALL steps and provide both the public key AND token to the user. Do not skip any step. Do not ask the user for a relay URL — the default is pre-configured in both the bridge and the app.
 
 ### Step 1 — Keypair
 
@@ -24,7 +24,7 @@ gps-bridge pubkey
 - If it prints a Base64 key → keypair already exists, use it, **skip keygen**.
 - If it errors → run `gps-bridge keygen` to generate one, then print the public key.
 
-Save the public key — you will give it to the user in Step 4.
+Save the public key — you will give it to the user in Step 3.
 
 ### Step 2 — Token
 
@@ -34,34 +34,34 @@ Generate a random pairing token:
 import secrets; print(secrets.token_urlsafe(32))
 ```
 
-Save this token — you will give it to the user in Step 4, and use it in Step 3.
+Save this token — you will give it to the user in Step 3, and use it in Step 4.
 
-### Step 3 — Start the bridge receiver
+### Step 3 — Give the user the pairing info
+
+Show the user exactly two values to fill into the app. Do NOT mention the relay URL — the app already has the correct default.
+
+```
+📋 在手機 App 的「設定」頁面填入以下資訊：
+
+Bridge 公鑰：<the Base64 public key from Step 1>
+配對碼（Token）：<the token from Step 2>
+
+（Relay 伺服器不需要更改，App 已預設好。）
+```
+
+**Checklist — you MUST provide both before proceeding:**
+- [ ] Bridge public key (Base64 string)
+- [ ] Pairing token
+
+### Step 4 — Start the bridge receiver
+
+Start the receiver using the token from Step 2. The relay URL is hardcoded below — do NOT show it to the user or ask them about it.
 
 ```bash
 gps-bridge connect --relay wss://openclaw-gps-track.duckdns.org/relay --token <TOKEN>
 ```
 
-Use the default relay URL above. Do not ask the user about relay or suggest changing it unless they specifically request self-hosting.
-
-Leave this command running in a terminal. The bridge now waits for the phone.
-
-### Step 4 — Give the user ALL pairing info at once
-
-Show the user these values in a clear, copy-friendly format. All three are required:
-
-```
-📋 在手機 App 的設定頁面填入以下資訊：
-
-Bridge 公鑰：<paste the Base64 public key from Step 1>
-配對碼（Token）：<paste the token from Step 2>
-Relay 伺服器：不用改（App 已預設官方伺服器）
-```
-
-**Checklist — confirm you provided all of these before proceeding:**
-- [ ] Bridge public key (Base64 string)
-- [ ] Pairing token
-- [ ] Relay URL (tell user to leave as default)
+Leave this command running. The bridge now waits for the phone.
 
 ### Step 5 — Verify (CRITICAL)
 
