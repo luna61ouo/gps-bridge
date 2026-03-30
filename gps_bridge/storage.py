@@ -279,31 +279,47 @@ def get_latest(name: str | None = None) -> dict | None:
     return dict(row)
 
 
-def get_history(limit: int = 10, name: str | None = None) -> list[dict]:
+def get_history(
+    limit: int = 10,
+    name: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+) -> list[dict]:
     """
-    Return the *limit* most-recently stored history records (is_history=1), newest first.
+    Return history records (is_history=1), newest first.
 
     Args:
         limit: Maximum number of records to return (capped at MAX_RECORDS).
         name:  Filter by tracker name. If None, returns history across all trackers.
+        since: ISO-8601 timestamp. Only return records received at or after this time.
+        until: ISO-8601 timestamp. Only return records received at or before this time.
 
     Returns:
         List of dicts with keys: id, name, lat, lng, timestamp, received_at.
     """
     limit = max(1, min(limit, MAX_RECORDS))
+    conditions = ["is_history = 1"]
+    params: list = []
+
+    if name is not None:
+        conditions.append("name = ?")
+        params.append(name)
+    if since is not None:
+        conditions.append("received_at >= ?")
+        params.append(since)
+    if until is not None:
+        conditions.append("received_at <= ?")
+        params.append(until)
+
+    where = " AND ".join(conditions)
+    params.append(limit)
+
     with _get_conn() as conn:
-        if name is not None:
-            rows = conn.execute(
-                "SELECT id, name, lat, lng, timestamp, received_at FROM locations "
-                "WHERE name = ? AND is_history = 1 ORDER BY received_at DESC LIMIT ?",
-                (name, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT id, name, lat, lng, timestamp, received_at FROM locations "
-                "WHERE is_history = 1 ORDER BY received_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = conn.execute(
+            f"SELECT id, name, lat, lng, timestamp, received_at FROM locations "
+            f"WHERE {where} ORDER BY received_at DESC LIMIT ?",
+            params,
+        ).fetchall()
     return [dict(row) for row in rows]
 
 

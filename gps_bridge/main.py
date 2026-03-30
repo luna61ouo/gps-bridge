@@ -212,10 +212,20 @@ def latest(name: str | None) -> None:
     default=None,
     help="Tracker name to query. Omit to get history across all trackers.",
 )
-def history(limit: int, name: str | None) -> None:
+@click.option(
+    "--since",
+    default=None,
+    help="Only show records after this time (ISO-8601, e.g. 2026-03-28T00:00:00).",
+)
+@click.option(
+    "--until",
+    default=None,
+    help="Only show records before this time (ISO-8601, e.g. 2026-03-28T23:59:59).",
+)
+def history(limit: int, name: str | None, since: str | None, until: str | None) -> None:
     """Show recent GPS history as a JSON array (newest first)."""
     init_db()
-    records = get_history(limit=limit, name=name)
+    records = get_history(limit=limit, name=name, since=since, until=until)
     if not records:
         click.echo(json.dumps([]))
         return

@@ -153,7 +153,7 @@ systemctl --user stop gps-bridge-connect
 | `gps-bridge pubkey` | Print the current public key |
 | `gps-bridge connect --token TOKEN` | Connect to relay and receive GPS |
 | `gps-bridge latest [--name NAME]` | Print latest GPS fix as JSON |
-| `gps-bridge history [--limit N] [--name NAME]` | Print recent history as JSON array |
+| `gps-bridge history [--limit N] [--name NAME] [--since T] [--until T]` | Print history as JSON array (supports time range) |
 | `gps-bridge list` | List all trackers with latest fix and record count |
 | `gps-bridge status [--name NAME]` | Show tracker status and phone-side settings |
 | `gps-bridge config [--timezone TZ]` | Show or update settings |
@@ -203,7 +203,8 @@ AES-GCM encrypt GPS payload       ──►  AES-GCM decrypt → store in SQLite
 ## Data storage
 
 - SQLite database at `~/.gps-bridge/locations.db`
-- Most recent **1000** records are retained (configurable via `gps-bridge config`)
+- History retention is controlled by the phone app settings (default: 1 week)
+- Single query limit: 1000 records (configurable via `gps-bridge config`)
 - All data stays on your own machine
 
 ---

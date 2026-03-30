@@ -98,6 +98,9 @@ gps-bridge list
 gps-bridge history --limit N
 gps-bridge history --limit N --name "Alice"
 
+# History within a time range (ISO-8601)
+gps-bridge history --limit 100 --since "2026-03-27T00:00:00" --until "2026-03-27T23:59:59"
+
 # Show tracker status and phone-side settings
 gps-bridge status
 gps-bridge status --name "Alice"
