@@ -45,8 +45,6 @@ Show the user exactly two values to fill into the app. Do NOT mention the relay 
 
 Bridge 公鑰：<the Base64 public key from Step 1>
 配對碼（Token）：<the token from Step 2>
-
-（Relay 伺服器不需要更改，App 已預設好。）
 ```
 
 **Checklist — you MUST provide both before proceeding:**
@@ -55,10 +53,10 @@ Bridge 公鑰：<the Base64 public key from Step 1>
 
 ### Step 4 — Start the bridge receiver
 
-Start the receiver using the token from Step 2. The relay URL is hardcoded below — do NOT show it to the user or ask them about it.
+Start the receiver using the token from Step 2. The relay URL is built into the bridge — do not specify it.
 
 ```bash
-gps-bridge connect --relay wss://openclaw-gps-track.duckdns.org/relay --token <TOKEN>
+gps-bridge connect --token <TOKEN>
 ```
 
 Leave this command running. The bridge now waits for the phone.
