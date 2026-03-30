@@ -143,8 +143,8 @@ def keygen(force: bool) -> None:
 @click.option(
     "--relay",
     default=DEFAULT_RELAY_URL,
-    show_default=True,
-    help="Base WebSocket URL of the relay.",
+    hidden=True,
+    help="Override the default relay URL (advanced / self-hosted only).",
 )
 @click.option(
     "--token",
