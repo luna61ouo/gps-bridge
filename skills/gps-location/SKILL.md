@@ -164,13 +164,20 @@ gps-bridge status
 ```
 
 This shows each tracker's phone-side settings:
-- `提取確認方式` — auto / deny (ask is under development)
+- `提取確認方式` — auto / ask / deny
 - `更新間隔` — how often the phone polls GPS
 - `歷史刻度` — how often a history waypoint is saved (e.g. 10 分鐘)
 - `歷史保留` — how far back data is kept (e.g. 1 週)
 
 If `歷史刻度` is `不儲存`, history is disabled — inform the user and use `gps-bridge latest` only.
 If `提取確認方式` is `拒絕`, no data is being sent at all.
+If `提取確認方式` is `詢問` (ask), you must send a request first:
+
+```bash
+gps-bridge request
+```
+
+This sends a notification to the user's phone. Wait for the user to approve, then check `gps-bridge latest` for new data. Tell the user: "已向你的手機發送位置請求，請在手機上確認。"
 
 ### Step 2: Estimate record count for the requested range
 

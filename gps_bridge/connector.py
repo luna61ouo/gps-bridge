@@ -21,11 +21,50 @@ import logging
 import websockets
 from cryptography.exceptions import InvalidTag
 
-from gps_bridge.config import load_private_key
+from gps_bridge.config import GPS_BRIDGE_DIR, ensure_dir, load_private_key
 from gps_bridge.crypto import decrypt_payload
 from gps_bridge.storage import init_db, insert_location, update_phone_status, update_tracker_settings
 
 logger = logging.getLogger("gps_bridge.connector")
+
+_CONNECTION_FILE = GPS_BRIDGE_DIR / "connection.json"
+
+
+def _save_connection_info(relay_url: str, token: str, name: str) -> None:
+    """Persist relay URL and token so `gps-bridge request` can reuse them."""
+    ensure_dir()
+    with open(_CONNECTION_FILE, "w", encoding="utf-8") as f:
+        json.dump({"relay_url": relay_url, "token": token, "name": name}, f)
+
+
+def _load_connection_info() -> dict | None:
+    """Load stored connection info, or None if not available."""
+    if not _CONNECTION_FILE.exists():
+        return None
+    with open(_CONNECTION_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+async def send_location_request() -> bool:
+    """
+    Send a location_request to the phone via relay.
+    Used in 'ask' mode to request user permission before getting GPS.
+    Returns True if sent successfully.
+    """
+    info = _load_connection_info()
+    if not info:
+        logger.error("No connection info found. Run `gps-bridge connect` first.")
+        return False
+
+    ws_url = f"{info['relay_url'].rstrip('/')}/ws/{info['token']}"
+    try:
+        async with websockets.connect(ws_url) as ws:
+            await ws.send(json.dumps({"type": "location_request"}))
+            logger.info("Sent location_request to phone")
+            return True
+    except Exception as e:
+        logger.error("Failed to send location_request: %s", e)
+        return False
 
 
 async def run(relay_url: str, token: str, name: str = "default") -> None:
@@ -39,6 +78,9 @@ async def run(relay_url: str, token: str, name: str = "default") -> None:
     """
     init_db()
     private_key = load_private_key()
+
+    # Store connection info so `gps-bridge request` can reuse it
+    _save_connection_info(relay_url, token, name)
 
     ws_url = f"{relay_url.rstrip('/')}/ws/{token}"
     logger.info("Connecting to relay: %s (name=%s)", ws_url, name)
@@ -56,32 +98,38 @@ async def run(relay_url: str, token: str, name: str = "default") -> None:
                     update_phone_status(name, False)
                     continue
                 update_phone_status(name, True)
-                _handle_message(raw, private_key, name)
+                stored = _handle_message(raw, private_key, name)
+                # Notify phone that location was accessed
+                if stored:
+                    try:
+                        await websocket.send(json.dumps({"type": "location_accessed"}))
+                    except Exception:
+                        pass
         except websockets.ConnectionClosed:
             logger.warning("Connection closed, reconnecting...")
             print("Connection closed, reconnecting...")
 
 
-def _handle_message(raw: str, private_key, name: str) -> None:
-    """Decrypt and store a single incoming message."""
+def _handle_message(raw: str, private_key, name: str) -> bool:
+    """Decrypt and store a single incoming message. Returns True if stored."""
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
         logger.warning("Received non-JSON message, ignoring.")
-        return
+        return False
 
     try:
         plaintext = decrypt_payload(payload, private_key)
     except (ValueError, InvalidTag) as exc:
         logger.warning("Decryption failed: %s", exc)
         print(f"[warn] Decryption failed: {exc}")
-        return
+        return False
 
     try:
         data = json.loads(plaintext)
     except json.JSONDecodeError:
         logger.warning("Decrypted payload is not valid JSON.")
-        return
+        return False
 
     lat = data.get("lat")
     lng = data.get("lng")
@@ -89,7 +137,7 @@ def _handle_message(raw: str, private_key, name: str) -> None:
 
     if lat is None or lng is None or timestamp is None:
         logger.warning("Missing lat/lng/timestamp in payload.")
-        return
+        return False
 
     save_history = bool(data.get("save_history", False))
     retention_hours = int(data.get("retention_hours", 168))
@@ -110,3 +158,4 @@ def _handle_message(raw: str, private_key, name: str) -> None:
 
     history_marker = " [H]" if save_history else ""
     print(f"[{name}] {timestamp}  lat={lat:.6f}  lng={lng:.6f}{history_marker}")
+    return True

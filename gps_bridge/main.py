@@ -174,6 +174,26 @@ def connect(relay: str, token: str, name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# request
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+def request() -> None:
+    """Send a location request to the phone (for 'ask' mode)."""
+    from gps_bridge.connector import send_location_request
+    success = asyncio.run(send_location_request())
+    if success:
+        click.echo("Location request sent. Waiting for phone to respond...")
+    else:
+        click.echo(
+            "Failed to send request. Is gps-bridge connect running?",
+            err=True,
+        )
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # latest
 # ---------------------------------------------------------------------------
 
