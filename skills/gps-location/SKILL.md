@@ -82,6 +82,18 @@ gps-bridge latest
 
 ---
 
+## Multi-tracker awareness
+
+Before querying location, always check how many trackers exist:
+
+```bash
+gps-bridge list
+```
+
+- If only one tracker (usually "default") → use it directly, no need to ask
+- If multiple trackers → ask the user which one, or infer from context (e.g. "Alice 在哪？" → `--name Alice`)
+- Never assume "default" when multiple trackers exist — always confirm
+
 ## Commands
 
 ```bash
