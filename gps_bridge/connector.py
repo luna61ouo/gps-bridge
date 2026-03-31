@@ -98,6 +98,20 @@ def _handle_message(raw: str, private_key, name: str) -> bool:
         logger.warning("Received non-JSON message, ignoring.")
         return False
 
+    # Handle plaintext control messages from the phone app
+    msg_type = payload.get("type")
+    if msg_type == "settings_update":
+        update_tracker_settings(
+            name,
+            confirm_mode=payload.get("confirm_mode"),
+            update_interval_seconds=payload.get("update_interval_seconds"),
+            history_granularity_seconds=payload.get("history_granularity_seconds"),
+            retention_hours=payload.get("retention_hours"),
+        )
+        logger.info("[%s] Settings updated via push: confirm_mode=%s", name, payload.get("confirm_mode"))
+        print(f"[{name}] Settings updated: confirm_mode={payload.get('confirm_mode')}")
+        return False
+
     try:
         plaintext = decrypt_payload(payload, private_key)
     except (ValueError, InvalidTag) as exc:

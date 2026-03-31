@@ -229,10 +229,38 @@ def latest(name: str | None) -> None:
     """Print the latest GPS coordinates as JSON."""
     init_db()
     record = get_latest(name=name)
+
+    # Get confirm mode from stored settings (pushed by phone app)
+    settings = get_tracker_settings(name=name) if name else []
+    confirm_mode = settings[0].get("confirm_mode") if settings else None
+
     if record is None:
-        click.echo(json.dumps({"status": "no data"}))
+        result: dict = {"status": "no data"}
+        if confirm_mode:
+            result["confirm_mode"] = confirm_mode
+        if confirm_mode == "ask":
+            result["hint"] = f"Phone is in ask mode. Run: gps-bridge request --name {name}"
+        elif confirm_mode == "deny":
+            result["hint"] = "Phone is set to deny all location requests."
+        click.echo(json.dumps(result))
         sys.exit(1)
-    click.echo(json.dumps(_add_local_time(record), indent=2))
+
+    result = _add_local_time(record)
+    if confirm_mode:
+        result["confirm_mode"] = confirm_mode
+
+    # Check freshness — add hint if stale and in ask mode
+    from datetime import datetime, timezone
+    try:
+        received = datetime.fromisoformat(record["received_at"])
+        age_seconds = (datetime.now(timezone.utc) - received).total_seconds()
+        if age_seconds > 600 and confirm_mode == "ask":
+            result["stale"] = True
+            result["hint"] = f"Data is {int(age_seconds // 60)} min old. Phone is in ask mode. Run: gps-bridge request --name {name}"
+    except (ValueError, TypeError):
+        pass
+
+    click.echo(json.dumps(result, indent=2))
 
 
 # ---------------------------------------------------------------------------

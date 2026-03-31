@@ -40,63 +40,68 @@ gps-bridge config                                   # Show/update settings
 
 ---
 
-## Output format
+## How to query location
 
-**latest:**
-```json
-{
-  "name": "Luna",
-  "lat": 24.9849,
-  "lng": 121.2858,
-  "timestamp": "2026-03-26T06:38:36.525459",
-  "received_at": "2026-03-26T06:38:37.044299+00:00"
-}
-```
-
-- `timestamp` — when the phone recorded the fix
-- `received_at` — when gps-bridge stored it (UTC)
-- No data: `{"status": "no data"}` with exit code 1
-
----
-
-## How to query location (standard flow)
-
-**Always follow this flow when the user asks for their location:**
-
-### Step 1 — Get latest data
+**Just run `gps-bridge latest`** — the output already includes everything you need:
 
 ```bash
 gps-bridge latest --name <NAME>
 ```
 
-### Step 2 — Check freshness
+The output now includes `confirm_mode` and `hint` fields when relevant. **Follow the `hint` if present.** No need to run a separate `status` command.
 
-Compare `received_at` to now (UTC).
+### Example outputs
 
-- **< 10 minutes old** → data is fresh, use it directly. Done.
-- **≥ 10 minutes old OR no data** → go to Step 3.
-
-### Step 3 — Check confirm mode (IMPORTANT)
-
-**Do NOT assume stale data means an error.** The phone may be in ask/deny mode.
-
-```bash
-gps-bridge status --name <NAME>
+**Fresh data (auto mode):**
+```json
+{
+  "name": "Luna",
+  "lat": 24.9849,
+  "lng": 121.2858,
+  "confirm_mode": "auto",
+  ...
+}
 ```
+→ Use the coordinates directly.
 
-| `提取確認方式` | Meaning | Action |
-|----------------|---------|--------|
-| `auto` | Continuous push | Data should be flowing — stale data likely means `gps-bridge connect` is not running or the phone stopped tracking. Inform the user. |
-| `詢問` (ask) | Request-based | Send a request and tell the user to approve on their phone: |
-| `拒絕` (deny) | Blocked | Tell the user: the phone is set to deny all location requests. |
-
-**For ask mode:**
-
-```bash
-gps-bridge request --name <NAME>
+**No data (ask mode):**
+```json
+{
+  "status": "no data",
+  "confirm_mode": "ask",
+  "hint": "Phone is in ask mode. Run: gps-bridge request --name Luna"
+}
 ```
+→ Run the command in `hint`, then tell the user: "已發送位置請求，請在手機上確認。" Wait ~15 seconds, then re-run `gps-bridge latest`.
 
-Then tell the user: "已發送位置請求，請在手機上確認。" Wait ~15 seconds, then re-run `gps-bridge latest --name <NAME>` to check if new data arrived.
+**Stale data (ask mode):**
+```json
+{
+  "name": "Luna",
+  "lat": 24.9849,
+  "lng": 121.2858,
+  "confirm_mode": "ask",
+  "stale": true,
+  "hint": "Data is 45 min old. Phone is in ask mode. Run: gps-bridge request --name Luna"
+}
+```
+→ Show the old location with a note that it may be outdated. Run `hint` command to request a fresh fix.
+
+**Deny mode:**
+```json
+{
+  "status": "no data",
+  "confirm_mode": "deny",
+  "hint": "Phone is set to deny all location requests."
+}
+```
+→ Inform the user that their phone is blocking location sharing.
+
+**No confirm_mode (settings not yet received):**
+```json
+{"status": "no data"}
+```
+→ Bridge hasn't received settings yet. Check if `gps-bridge connect` is running and phone tracking is started.
 
 ---
 
