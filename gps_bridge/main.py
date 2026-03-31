@@ -170,17 +170,17 @@ def connect(relay: str, token: str | None, name: str) -> None:
 
     # Resolve token: CLI arg > saved in config > error
     if token:
-        save_connection_token(token)
+        save_connection_token(token, name)
     else:
-        token = load_connection_token()
+        token = load_connection_token(name)
         if not token:
             click.echo(
-                "No token provided and no saved token found.\n"
-                "Run: gps-bridge connect --token <YOUR_TOKEN>",
+                f"No token provided and no saved token for '{name}'.\n"
+                f"Run: gps-bridge connect --token <YOUR_TOKEN> --name {name}",
                 err=True,
             )
             sys.exit(1)
-        click.echo(f"Using saved token from config.")
+        click.echo(f"Using saved token for '{name}'.")
 
     from gps_bridge.connector import run
     try:
@@ -195,10 +195,16 @@ def connect(relay: str, token: str | None, name: str) -> None:
 
 
 @cli.command()
-def request() -> None:
+@click.option(
+    "--name",
+    default="default",
+    show_default=True,
+    help="Tracker name to send the request to.",
+)
+def request(name: str) -> None:
     """Send a location request to the phone (for 'ask' mode)."""
     from gps_bridge.connector import send_location_request
-    success = asyncio.run(send_location_request())
+    success = asyncio.run(send_location_request(name=name))
     if success:
         click.echo("Location request sent. Waiting for phone to respond...")
     else:

@@ -234,17 +234,38 @@ def load_public_key() -> X25519PublicKey:
     return public_key_from_bytes(raw)
 
 
-def save_connection_token(token: str) -> None:
-    """Persist the pairing token into config.json for reuse."""
+def save_connection_token(token: str, name: str = "default") -> None:
+    """Persist the pairing token for a tracker into config.json."""
     data = _read_raw()
-    data["token"] = token
+    tokens = data.get("tokens", {})
+    tokens[name] = token
+    data["tokens"] = tokens
+    # Also keep "token" for backward compatibility (default tracker)
+    if name == "default":
+        data["token"] = token
     _write_raw(data)
 
 
-def load_connection_token() -> str | None:
-    """Load the stored pairing token, or None if not set."""
+def load_connection_token(name: str = "default") -> str | None:
+    """Load the stored pairing token for a tracker, or None if not set."""
     data = _read_raw()
-    return data.get("token")
+    tokens = data.get("tokens", {})
+    if name in tokens:
+        return tokens[name]
+    # Fallback: old single-token format
+    if name == "default":
+        return data.get("token")
+    return None
+
+
+def list_saved_tokens() -> dict[str, str]:
+    """Return all saved tracker name -> token pairs."""
+    data = _read_raw()
+    tokens = data.get("tokens", {})
+    # Include legacy single token if exists and not already in tokens
+    if "default" not in tokens and "token" in data:
+        tokens["default"] = data["token"]
+    return tokens
 
 
 def load_public_key_b64() -> str:

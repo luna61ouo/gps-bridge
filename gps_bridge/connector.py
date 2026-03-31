@@ -28,15 +28,15 @@ from gps_bridge.storage import init_db, insert_location, update_phone_status, up
 logger = logging.getLogger("gps_bridge.connector")
 
 
-async def send_location_request() -> bool:
+async def send_location_request(name: str = "default") -> bool:
     """
     Send a location_request to the phone via relay.
     Used in 'ask' mode to request user permission before getting GPS.
     Returns True if sent successfully.
     """
-    token = load_connection_token()
+    token = load_connection_token(name)
     if not token:
-        logger.error("No saved token found. Run `gps-bridge connect --token <TOKEN>` first.")
+        logger.error("No saved token for '%s'. Run `gps-bridge connect --token <TOKEN> --name %s` first.", name, name)
         return False
 
     ws_url = f"{DEFAULT_RELAY_URL.rstrip('/')}/ws/{token}"
