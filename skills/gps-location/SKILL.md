@@ -100,15 +100,25 @@ gps-bridge latest --name <TRACKER_NAME>
 
 ## Multi-tracker awareness
 
-Before querying location, always check how many trackers exist:
+The user talking to OpenClaw is the **owner** of this bridge. Their own tracker name was set during setup.
 
-```bash
-gps-bridge list
-```
+### Who to query
 
-- If only one tracker (usually "default") → use it directly, no need to ask
-- If multiple trackers → ask the user which one, or infer from context (e.g. "Alice 在哪？" → `--name Alice`)
-- Never assume "default" when multiple trackers exist — always confirm
+| User says | Action |
+|-----------|--------|
+| "我在哪" / "where am I" | Query the **owner's** tracker (the name set during setup) |
+| "Alice 在哪" / "where is Alice" | Query `--name Alice` |
+| Ambiguous | Query the owner's tracker |
+
+### How to know the owner's tracker name
+
+Run `gps-bridge list` once at the start of a conversation. The owner's tracker is usually the one set up first or the one with the most recent data. If unsure, ask once and remember.
+
+### When multiple trackers exist
+
+- "我在哪" → always the owner, never ask
+- "誰在哪" / a specific name → match by name
+- "所有人在哪" → query all trackers
 
 ## Commands
 
