@@ -112,6 +112,10 @@ Same as first-time pairing, but:
 gps-bridge connect --token <TOKEN> --name <NAME>
 # Ctrl+C after it starts
 
+# Edit the service file: replace YOUR_NAME with the tracker name
+# e.g. sed -i 's/YOUR_NAME/Luna/' gps-bridge-connect.service
+nano gps-bridge-connect.service
+
 # Install service
 mkdir -p ~/.config/systemd/user
 cp gps-bridge-connect.service ~/.config/systemd/user/
@@ -120,7 +124,9 @@ systemctl --user enable gps-bridge-connect
 systemctl --user start gps-bridge-connect
 ```
 
-For multiple trackers, create separate service files for each name.
+**IMPORTANT:** The service file contains `--name YOUR_NAME` — you **must** replace `YOUR_NAME` with the actual tracker name (e.g. `Luna`) before installing. Without `--name`, the service will fail to start.
+
+For multiple trackers, create separate service files for each name (e.g. `gps-bridge-connect-alice.service`).
 
 ---
 

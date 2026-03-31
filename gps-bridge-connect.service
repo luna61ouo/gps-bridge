@@ -8,7 +8,8 @@ Type=simple
 # Token is stored in ~/.gps-bridge/config.json (saved on first `gps-bridge connect --token <TOKEN>`)
 # No EnvironmentFile or connect.env needed.
 # Replace the path below with the output of: which gps-bridge
-ExecStart=/usr/local/bin/gps-bridge connect
+# Replace YOUR_NAME with the tracker name used during pairing (e.g. Luna, Alice)
+ExecStart=/usr/local/bin/gps-bridge connect --name YOUR_NAME
 Restart=on-failure
 RestartSec=10
 
