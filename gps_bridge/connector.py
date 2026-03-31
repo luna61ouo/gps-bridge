@@ -79,10 +79,10 @@ async def run(relay_url: str, token: str, name: str = "default") -> None:
                     continue
                 update_phone_status(name, True)
                 stored = _handle_message(raw, private_key, name)
-                # Notify phone that location was accessed
+                # Confirm receipt to phone (silent — no notification on phone)
                 if stored:
                     try:
-                        await websocket.send(json.dumps({"type": "location_accessed"}))
+                        await websocket.send(json.dumps({"type": "location_stored"}))
                     except Exception:
                         pass
         except websockets.ConnectionClosed:
