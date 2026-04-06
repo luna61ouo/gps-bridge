@@ -67,22 +67,44 @@ Public key (share this with your phone app):
 
 Copy the public key — you will enter it into the phone app.
 
-### 2. Connect to the relay
+### 2. Generate a pairing token
+
+Generate a random token — this is the secret that pairs your computer with the phone app:
 
 ```bash
-gps-bridge connect --token your-token
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-The default relay server is pre-configured. Once connected, GPS data sent from the phone will appear:
+Example output: `3Vq8mXkL2wRpN7cYeZoAjDtHsBfUgIvC0nKl5yPxQ1M`
+
+Save this token — you will enter it into the phone app and use it in the next step.
+
+### 3. Connect to the relay
+
+Replace `<YOUR_TOKEN>` with the token you just generated.
+Replace `<NAME>` with a name for this tracker (e.g. your name or "iphone" — any label you prefer).
+
+```bash
+gps-bridge connect --name <NAME> --token <YOUR_TOKEN>
+```
+
+Example:
+```bash
+gps-bridge connect --name iphone --token 3Vq8mXkL2wRpN7cYeZoAjDtHsBfUgIvC0nKl5yPxQ1M
+```
+
+**This command will block — it is a long-running process that stays open waiting for GPS data. This is expected. Do not close it.**
+
+Once connected, GPS data sent from the phone will appear:
 ```
 Waiting for GPS data from phone... (Ctrl+C to stop)
 [ok] 2026-03-26T06:31:02  lat=24.984968  lng=121.285887
 ```
 
-### 3. Check the latest location
+### 4. Check the latest location
 
 ```bash
-gps-bridge latest
+gps-bridge latest --name <NAME>
 ```
 
 ```json
