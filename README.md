@@ -31,6 +31,34 @@ gps-bridge latest  ←── called by OpenClaw skill
 
 - Python 3.10+
 - Linux / macOS / Windows
+- **Phone app:** claw GPS Tracker (required — this is the sender side)
+
+---
+
+## Phone App
+
+gps-bridge receives encrypted GPS data from the **claw GPS Tracker** app on your phone. You must install the app first.
+
+**Download:**
+- iOS (iPhone): [App Store](https://apps.apple.com/tw/app/claw-gps-tracker/id6761358773)
+- Android: Coming soon
+
+**Phone-side setup (after bridge pairing):**
+
+1. Open the app → tap the **gear icon** (Settings)
+2. Scroll to **Pairing** section
+3. Enter the **Token** and **Bridge Public Key** provided by OpenClaw
+4. Go back to the main screen → tap **Start Tracking**
+5. The status card shows GPS coordinates and delivery confirmation
+
+**App features:**
+- End-to-end encrypted (X25519 + AES-256-GCM)
+- Sharing modes: Auto (continuous) / Ask (request-based) / Deny
+- Configurable update interval (5 sec – 30 min)
+- History tracking with configurable granularity and retention
+- Connection test buttons (Relay → Token → Public Key)
+- Send log for debugging (last 50 attempts)
+- Background tracking with motion detection (skips GPS when stationary to save battery)
 
 ---
 

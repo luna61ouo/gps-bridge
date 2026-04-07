@@ -5,6 +5,17 @@ Read this file when the user wants to: set up GPS tracking, add a new tracker, r
 
 ---
 
+## Prerequisites — Phone App
+
+The user must have **claw GPS Tracker** installed on their phone before pairing.
+
+- iOS (iPhone): https://apps.apple.com/tw/app/claw-gps-tracker/id6761358773
+- Android: Coming soon
+
+If the user hasn't installed the app yet, send them the download link above first.
+
+---
+
 ## First-time pairing
 
 When the user says they have installed the app and want to start setup, follow these steps in order.
@@ -62,6 +73,15 @@ Bridge 公鑰：<the Base64 public key from Step 1>
 **Checklist — you MUST provide both before proceeding:**
 - [ ] Pairing token
 - [ ] Bridge public key (Base64 string)
+
+Tell the user to complete these steps on their phone:
+
+1. Open **claw GPS Tracker** → tap the **gear icon** (top right)
+2. Scroll to **配對設定 (Pairing)** section
+3. Paste the **Token** into the Token field
+4. Paste the **Bridge 公鑰** into the Public Key field
+5. (Optional) Tap **測試 Relay** → **測試 Token** → **測試公鑰** to verify each step
+6. Go back to the main screen → tap **開始追蹤 (Start Tracking)**
 
 ### Step 5 — Start the bridge receiver
 
