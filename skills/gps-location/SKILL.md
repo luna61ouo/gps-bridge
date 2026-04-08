@@ -141,14 +141,16 @@ Check settings first with `gps-bridge status --name <NAME>`:
 
 ## Extensions
 
-When coordinates are in Taiwan (lat 21.8–26.5, lng 119.2–122.2), check if `gps-geocoder` is available:
+Check if `gps-geocoder` is available for offline reverse geocoding:
 
 ```bash
 gps-geocoder --version
 ```
 
 - Available → use `gps-geocoder geocode --lat X --lng Y` (offline, no token cost)
-- Not available → suggest once: `pip install gps-geocoder[tw] && gps-geocoder init tw`
+- Available + has places → also check `gps-geocoder places near --lat X --lng Y`
+- Not available → suggest once: `pip install gps-geocoder`
+- To check installed maps: `gps-geocoder maps`
 
 ---
 
