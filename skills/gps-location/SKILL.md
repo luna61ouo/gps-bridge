@@ -42,13 +42,25 @@ gps-bridge config                                   # Show/update settings
 
 ## How to query location
 
-**Just run `gps-bridge latest`** — the output already includes everything you need:
+**Prefer `gps-geocoder latest` when installed** — it returns a human-readable location (place name or address) in one step. Fall back to `gps-bridge latest` only when:
 
-```bash
-gps-bridge latest --name <NAME>
+- `gps-geocoder` is not installed (check with `gps-geocoder --version`)
+- The user explicitly asks for raw coordinates
+- You need `confirm_mode` / `hint` / `stale` fields for ask-mode handling
+
+### Decision tree
+
+```
+User asks about location →
+  ├─ gps-geocoder installed? → gps-geocoder latest --name <NAME>
+  │    └─ Returns: "你在 {家|公司|路名+門牌|座標}"
+  │
+  └─ gps-geocoder not installed, or need raw coords / control info →
+       gps-bridge latest --name <NAME>
+       └─ Returns: {lat, lng, confirm_mode, hint, stale, ...}
 ```
 
-The output now includes `confirm_mode` and `hint` fields when relevant. **Follow the `hint` if present.** No need to run a separate `status` command.
+The `gps-bridge latest` output includes `confirm_mode` and `hint` fields when relevant. **Follow the `hint` if present.** No need to run a separate `status` command.
 
 ### Example outputs
 
@@ -139,18 +151,37 @@ Check settings first with `gps-bridge status --name <NAME>`:
 
 ---
 
-## Extensions
+## Extensions: gps-geocoder
 
-Check if `gps-geocoder` is available for offline reverse geocoding:
+`gps-geocoder` turns raw coordinates into a readable location. Check once per session:
 
 ```bash
 gps-geocoder --version
 ```
 
-- Available → use `gps-geocoder geocode --lat X --lng Y` (offline, no token cost)
-- Available + has places → also check `gps-geocoder places near --lat X --lng Y`
-- Not available → suggest once: `pip install gps-geocoder`
-- To check installed maps: `gps-geocoder maps`
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `gps-geocoder latest --name <NAME>` | Latest GPS fix + location name (one-shot) |
+| `gps-geocoder history --limit N --name <NAME>` | History with location names |
+| `gps-geocoder geocode --lat X --lng Y` | Geocode arbitrary coordinates |
+| `gps-geocoder places near --lat X --lng Y` | Nearby saved places |
+| `gps-geocoder maps` | List installed regional maps |
+
+### Priority
+
+When reverse geocoding, gps-geocoder returns the **first match** in this order:
+
+1. **Personal place within 50m** → `"家"`, `"公司"` (from `places:at`)
+2. **Map data** → `"台北市信義區忠孝東路四段123號"` (from `map:tw`)
+3. **Personal place within 500m** (fallback hint) (from `places:near`)
+4. **Raw coordinates** (from `none`)
+
+### If not installed
+
+Suggest once: `pip install gps-geocoder`
+To install map data: `pip install "gps-geocoder[maps]"` then `gps-geocoder init tw` (or `jp`, `kr`).
 
 ---
 
