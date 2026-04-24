@@ -218,31 +218,26 @@ systemctl --user stop gps-bridge-connect
 
 Once `gps-bridge` is installed, add the GPS skill to OpenClaw so it can query your location automatically.
 
-**From source (git clone):**
+Run one command:
 
 ```bash
-cp -r skills/gps-location ~/.openclaw/workspace/skills/
+gps-bridge install-skill
 ```
 
-**From pip install:**
+This copies the skill to `~/.openclaw/workspace/skills/gps-location/`. Use `--target <path>` to install elsewhere.
 
-```bash
-BRIDGE_DIR=$(python3 -c "import gps_bridge; import os; print(os.path.dirname(gps_bridge.__file__))")
-cp -r "${BRIDGE_DIR}/../skills/gps-location" ~/.openclaw/workspace/skills/
-```
-
-> The default workspace skills path is `~/.openclaw/workspace/skills/`. If your workspace is elsewhere, replace the path accordingly.
-
-**IMPORTANT — You MUST restart OpenClaw after copying the skill.**
+**IMPORTANT — You MUST restart OpenClaw after installing the skill.**
 OpenClaw only loads skills at startup. Without a restart, the skill will not be available and setup instructions will not be accessible to the AI.
 
-1. Copy the skill (see commands above)
+1. Run `gps-bridge install-skill`
 2. **Restart OpenClaw** (close and reopen, or restart the gateway)
 3. Only after restarting, ask OpenClaw to set up GPS tracking
 
+Repeat `gps-bridge install-skill` each time you upgrade `gps-bridge` so the skill file stays in sync with the installed version.
+
 The skill handles setup, pairing, freshness checks, and privacy (no raw coordinates in group chats).
 
-See [`skills/gps-location/SKILL.md`](skills/gps-location/SKILL.md) for the skill definition.
+See [`gps_bridge/skills/gps-location/SKILL.md`](gps_bridge/skills/gps-location/SKILL.md) for the skill definition.
 
 ---
 

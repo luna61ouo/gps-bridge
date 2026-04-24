@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gps-bridge"
-version = "0.1.0"
+version = "0.1.1"
 description = "Standalone encrypted GPS receiver bridge for OpenClaw"
 readme = "README.md"
 license = { text = "MIT" }
@@ -43,6 +43,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gps_bridge*"]
+
+[tool.setuptools.package-data]
+gps_bridge = ["skills/gps-location/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

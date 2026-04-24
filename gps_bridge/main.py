@@ -507,6 +507,52 @@ def config_cmd(
 
 
 # ---------------------------------------------------------------------------
+# install-skill
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="install-skill")
+@click.option(
+    "--target",
+    default=None,
+    help="Custom target skills directory (default: ~/.openclaw/workspace/skills)",
+)
+def install_skill(target: str | None) -> None:
+    """Copy the gps-location skill into the OpenClaw skills directory."""
+    import shutil
+    from pathlib import Path
+
+    # Source: the skills/ folder shipped with the package
+    pkg_dir = Path(__file__).resolve().parent
+    src = pkg_dir / "skills" / "gps-location"
+    if not src.exists():
+        # Fallback for editable installs or git clones: look one level up
+        src = pkg_dir.parent / "skills" / "gps-location"
+    if not src.exists():
+        click.echo(
+            f"ERROR: skill source not found at {src}\n"
+            "Your gps-bridge install may be corrupted. Try: pip install --force-reinstall gps-bridge",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Target
+    if target:
+        dst_root = Path(target).expanduser().resolve()
+    else:
+        dst_root = Path.home() / ".openclaw" / "workspace" / "skills"
+    dst = dst_root / "gps-location"
+
+    dst_root.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+
+    click.echo(f"Skill installed: {dst}")
+    click.echo("\nNow restart OpenClaw Gateway to reload the skill.")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
